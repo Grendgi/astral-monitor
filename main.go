@@ -49,7 +49,7 @@ var msk = time.FixedZone("MSK", 3*3600)
 type Check struct {
 	Name     string `json:"name"`
 	Label    string `json:"label,omitempty"`
-	Type     string `json:"type"` // https | smtp | dns | tcp
+	Type     string `json:"type"` // https (also plain http URLs) | smtp | tls | dns | tcp | file-age
 	Disabled bool   `json:"disabled,omitempty"`
 	Test     bool   `json:"test,omitempty"` // messages prefixed "[test]"
 
@@ -60,10 +60,15 @@ type Check struct {
 	BodyContains string `json:"bodyContains,omitempty"` // substring required in body
 	Insecure     bool   `json:"insecure,omitempty"`     // skip TLS verification (and cert days)
 
-	// smtp / tcp
+	// smtp / tcp / tls
 	Addr       string `json:"addr,omitempty"`
 	StartTLS   bool   `json:"starttls,omitempty"`
 	ServerName string `json:"serverName,omitempty"`
+	Banner     string `json:"banner,omitempty"` // tls: greeting must start with this ("* OK", "220")
+
+	// file-age (local): the newest file matching Glob must be younger than MaxAgeHours
+	Glob        string  `json:"glob,omitempty"`
+	MaxAgeHours float64 `json:"maxAgeHours,omitempty"`
 
 	// dns
 	Server  string     `json:"server,omitempty"` // 1.1.1.1:53
@@ -174,6 +179,8 @@ func target(c Check) string {
 		return c.URL
 	case "dns":
 		return "@" + c.Server
+	case "file-age":
+		return c.Glob
 	default:
 		return c.Addr
 	}
@@ -191,6 +198,11 @@ func runCheck(c Check) (ok bool, detail string, certDays *int, certHost string) 
 		return checkSMTP(c, timeout)
 	case "dns":
 		ok, detail := checkDNS(c, timeout)
+		return ok, detail, nil, ""
+	case "tls":
+		return checkTLS(c, timeout)
+	case "file-age":
+		ok, detail := checkFileAge(c)
 		return ok, detail, nil, ""
 	case "tcp":
 		conn, err := net.DialTimeout("tcp", c.Addr, timeout)
@@ -303,6 +315,64 @@ func checkSMTP(c Check, timeout time.Duration) (bool, string, *int, string) {
 	return true, "banner+STARTTLS ok", daysLeft(&state), sn
 }
 
+// checkTLS: implicit-TLS service (IMAPS 993, SMTPS 465): verified handshake,
+// then the server greeting must start with c.Banner.
+func checkTLS(c Check, timeout time.Duration) (bool, string, *int, string) {
+	host, _, err := net.SplitHostPort(c.Addr)
+	if err != nil {
+		return false, "bad addr", nil, ""
+	}
+	sn := c.ServerName
+	if sn == "" {
+		sn = host
+	}
+	d := &net.Dialer{Timeout: timeout}
+	conn, err := tls.DialWithDialer(d, "tcp", c.Addr, &tls.Config{ServerName: sn})
+	if err != nil {
+		return false, shortErr(err), nil, sn
+	}
+	defer conn.Close()
+	conn.SetDeadline(time.Now().Add(timeout))
+	state := conn.ConnectionState()
+	buf := make([]byte, 256)
+	n, err := conn.Read(buf)
+	greet := strings.TrimSpace(string(buf[:n]))
+	if n == 0 && err != nil {
+		return false, "greeting: " + shortErr(err), daysLeft(&state), sn
+	}
+	if c.Banner != "" && !strings.HasPrefix(greet, c.Banner) {
+		return false, fmt.Sprintf("greeting %q (want %q…)", clip(greet, 60), c.Banner), daysLeft(&state), sn
+	}
+	return true, "TLS ok, greeting " + clip(greet, 40), daysLeft(&state), sn
+}
+
+// checkFileAge: local freshness check, e.g. that the nightly backups exist.
+func checkFileAge(c Check) (bool, string) {
+	files, err := filepath.Glob(c.Glob)
+	if err != nil {
+		return false, "bad glob"
+	}
+	var newest time.Time
+	var name string
+	for _, f := range files {
+		if fi, err := os.Stat(f); err == nil && fi.Mode().IsRegular() && fi.ModTime().After(newest) {
+			newest, name = fi.ModTime(), filepath.Base(f)
+		}
+	}
+	if name == "" {
+		return false, "no file matches " + c.Glob
+	}
+	max := c.MaxAgeHours
+	if max <= 0 {
+		max = 26
+	}
+	age := time.Since(newest)
+	if age > time.Duration(max*float64(time.Hour)) {
+		return false, fmt.Sprintf("newest %s is %s old (max %gh)", name, fmtDur(age), max)
+	}
+	return true, fmt.Sprintf("newest %s, %s old", name, fmtDur(age))
+}
+
 func checkDNS(c Check, timeout time.Duration) (bool, string) {
 	r := &net.Resolver{
 		PreferGo: true,
@@ -393,7 +463,11 @@ type Engine struct {
 	PeerStale     int                    `json:"peerStale"`
 	PeerSilentHit bool                   `json:"peerSilentAlerted"`
 	Pending       []string               `json:"pending,omitempty"`
-	Started       time.Time              `json:"-"`
+	// WasSender: whether this vantage delivered last cycle. A secondary decides
+	// alerts all the time but drops them while the primary is active, so when it
+	// takes over it re-announces every check that is down at that moment.
+	WasSender bool      `json:"wasSender"`
+	Started   time.Time `json:"-"`
 }
 
 func readJSON(path string, v any) error {
@@ -874,14 +948,61 @@ func (m *Monitor) isSender(peer *Status) bool {
 	return m.eng.PeerStale >= m.cfg.PeerStaleCycles && time.Since(m.eng.Started) > 10*time.Minute
 }
 
+// takeover lists the checks that are down right now, for a vantage that has
+// just become the sender: their DOWN was decided while it was not sending.
+func (m *Monitor) takeover(cycle []string) []string {
+	var names []string
+	for n, a := range m.eng.Alerts {
+		if !a.Down {
+			continue
+		}
+		// Skip a DOWN that this very cycle decided (it is in cycle already).
+		dup := false
+		for _, s := range cycle {
+			if strings.HasPrefix(s, "[astral monitor] DOWN · "+checkTitle(n, m.local[n])+"\n") {
+				dup = true
+			}
+		}
+		if !dup {
+			names = append(names, n)
+		}
+	}
+	sort.Strings(names)
+	var out []string
+	now := time.Now()
+	for _, n := range names {
+		a := m.eng.Alerts[n]
+		r := m.local[n]
+		tgt, detail := "", a.LastDetail
+		if r != nil {
+			tgt, detail = r.Target, r.Detail
+		}
+		out = append(out, fmt.Sprintf("[astral monitor] DOWN · %s\n%s\n%s: %s\nsince %s (%s; re-announced by %s after taking over from %s)",
+			checkTitle(n, r), tgt, m.cfg.Vantage, detail, fmtMSK(a.Since), fmtDur(now.Sub(a.Since)), m.cfg.Vantage, m.cfg.Peer.Name))
+		a.SentDown, a.LastNotify = true, now
+	}
+	return out
+}
+
 func (m *Monitor) deliver(msgs []string, peer *Status) {
 	if !m.isSender(peer) {
 		m.eng.Pending = nil
+		m.eng.WasSender = false
 		for _, s := range msgs {
 			log.Printf("not sender (primary active), skip: %s", strings.SplitN(s, "\n", 2)[0])
 		}
 		return
 	}
+	if !m.eng.WasSender && m.cfg.Role == "secondary" {
+		// The secondary just took over: DOWNs it decided while the primary was
+		// sending were never delivered by this vantage (and maybe not by the
+		// primary either, if it died first), so announce what is down now.
+		if re := m.takeover(msgs); len(re) > 0 {
+			log.Printf("became sender: re-announcing %d active DOWN check(s)", len(re))
+			msgs = append(re, msgs...)
+		}
+	}
+	m.eng.WasSender = true
 	silence := silencedUntil(m.cfg.SilenceFile)
 	if silence == nil && peerFresh(peer, m.cfg.IntervalSec) && peer.SilencedUntil != nil && time.Now().Before(*peer.SilencedUntil) {
 		silence = peer.SilencedUntil

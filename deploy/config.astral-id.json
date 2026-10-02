@@ -114,6 +114,66 @@
       "timeoutSec": 15
     },
     {
+      "name": "site",
+      "label": "astralnet.io site",
+      "type": "https",
+      "url": "https://astralnet.io/",
+      "expect": [
+        200
+      ]
+    },
+    {
+      "name": "imaps",
+      "label": "IMAPS (mail clients)",
+      "type": "tls",
+      "addr": "mail.astralnet.io:993",
+      "serverName": "mail.astralnet.io",
+      "banner": "* OK",
+      "timeoutSec": 15
+    },
+    {
+      "name": "smtps",
+      "label": "submissions :465",
+      "type": "tls",
+      "addr": "mail.astralnet.io:465",
+      "serverName": "mail.astralnet.io",
+      "banner": "220",
+      "timeoutSec": 15
+    },
+    {
+      "name": "mail-account",
+      "label": "mail /account (app passwords)",
+      "type": "https",
+      "url": "https://mail.astralnet.io/account/",
+      "expect": [
+        200
+      ]
+    },
+    {
+      "name": "notify-hub",
+      "label": "astral-notify hub",
+      "type": "https",
+      "url": "http://127.0.0.1:9311/healthz",
+      "expect": [
+        200
+      ],
+      "bodyContains": "\"ok\":true"
+    },
+    {
+      "name": "backup-astral-id",
+      "label": "astral ID backup fresh (<26h)",
+      "type": "file-age",
+      "glob": "/var/backups/astral-id/astral-id-*",
+      "maxAgeHours": 26
+    },
+    {
+      "name": "backup-stalwart",
+      "label": "Stalwart backup fresh (<26h)",
+      "type": "file-age",
+      "glob": "/var/backups/stalwart/stalwart-*.tar.gz.age",
+      "maxAgeHours": 26
+    },
+    {
       "name": "dns-cloudflare",
       "label": "DNS via 1.1.1.1",
       "type": "dns",

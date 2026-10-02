@@ -40,6 +40,14 @@ The peer reads status.json over SSH with a forced command in `/root/.ssh/authori
   banner + STARTTLS (frankfurt only — astral-id would be probing itself).
 - DNS via 1.1.1.1 and via 8.8.8.8: MX astralnet.io → mx.astralnet.io; A mx/panel/id →
   95.181.212.217; A mail → 87.58.213.25.
+- Site and mail clients (both vantages): `https://astralnet.io/` (200), IMAPS
+  `mail.astralnet.io:993` and submissions `mail.astralnet.io:465` (type `tls`: verified TLS
+  handshake + greeting `* OK` / `220`), `https://mail.astralnet.io/account/` (200, where
+  users create app passwords).
+- Local on astral-id only: the astral-notify hub `http://127.0.0.1:9311/healthz`
+  (`"ok":true`), and backup freshness (type `file-age`): the newest
+  `/var/backups/astral-id/astral-id-*` and `/var/backups/stalwart/stalwart-*.tar.gz.age`
+  must be under 26 h old.
 
 ## Alert rules (one Telegram chat: the astralVPN bot's admin chat)
 
@@ -52,6 +60,10 @@ The peer reads status.json over SSH with a forced command in `/root/.ssh/authori
 - **PARTIAL** — one vantage fails 15 cycles in a row while the other passes (route problem).
 - **CERT** — certificate under 14 days: one message per check per day.
 - **probe silent** — the peer's status is stale 5 cycles in a row (and recovery of it).
+- **takeover** — the secondary decides alerts all the time but drops them while the primary
+  is sending. When it becomes the sender (primary silent ≥ 5 cycles) it re-announces every
+  check that is DOWN at that moment ("re-announced by astral-id after taking over"), so a
+  DOWN decided during the hand-over is not lost.
 - **daily** — 09:00 MSK summary: "all green" or what is down, nearest cert expiry,
   incidents in the last 24 h.
 
@@ -84,4 +96,4 @@ the monitor sends through the astral-notify hub (`/opt/astral-notify/README.md`)
 WARN/FLAPPING/PARTIAL/CERT → warning, everything else → info. If the hub is down or refuses,
 the monitor falls back to direct Telegram with `telegram.env`. Frankfurt has no hub.env, because
 it is not in the AWG tunnel, so it keeps sending directly. Both vantages run the same binary
-(the hub code is inert without HUB_URL). Frankfurt still runs the earlier build until its next update.
+(the hub code is inert without HUB_URL). Both vantages run the same build since 2026-10-02 (takeover + mail/backup probes).
