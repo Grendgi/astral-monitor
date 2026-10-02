@@ -32,8 +32,9 @@ The peer reads status.json over SSH with a forced command in `/root/.ssh/authori
 ## Checks (every 60 s, one quick retry per failure)
 
 - HTTPS (status code, certificate days left): panel `/` (200/302), panel `/api/health`
-  (401 "unauthorized" = the VPN backend answers), MSK direct `89.125.214.37:8443/api/health`
-  (401, bypasses the proxy), sub `/`, haproxy `/` (200 from frankfurt; 403 from astral-id — the
+  (401 "unauthorized" = the VPN backend answers), MSK direct (401, bypasses the proxy;
+  frankfurt `89.125.214.37:8443/api/health`, astral-id `10.20.0.11:8443/api/health` over awg-mgmt —
+  MSK tcp/8443 is open only to awg-mgmt and Frankfurt since 2026-10-03), sub `/`, haproxy `/` (200 from frankfurt; 403 from astral-id — the
   panel is behind the "VPN" access list), id `/readyz` (`ready:true`), console `/` (302),
   status `/` and `/status.json`.
 - SMTP: `mx.astralnet.io:25` banner + STARTTLS (both vantages), `mail.astralnet.io:587`
@@ -42,8 +43,9 @@ The peer reads status.json over SSH with a forced command in `/root/.ssh/authori
   95.181.212.217; A mail → 87.58.213.25.
 - Site and mail clients (both vantages): `https://astralnet.io/` (200), IMAPS
   `mail.astralnet.io:993` and submissions `mail.astralnet.io:465` (type `tls`: verified TLS
-  handshake + greeting `* OK` / `220`), `https://mail.astralnet.io/account/` (200, where
-  users create app passwords).
+  handshake + greeting `* OK` / `220`), `https://mailbox.astralnet.io/account/` (200, where
+  users create app passwords; the Stalwart web UI behind astralProxy since 2026-10-03 —
+  `mail.astralnet.io:443` is closed to the public).
 - Local on astral-id only: the astral-notify hub `http://127.0.0.1:9311/healthz`
   (`"ok":true`), and backup freshness (type `file-age`): the newest
   `/var/backups/astral-id/astral-id-*` and `/var/backups/stalwart/stalwart-*.tar.gz.age`

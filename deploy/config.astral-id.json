@@ -38,9 +38,9 @@
     },
     {
       "name": "vpn-direct",
-      "label": "VPN panel direct (MSK :8443)",
+      "label": "VPN panel direct (MSK :8443 via awg-mgmt)",
       "type": "https",
-      "url": "https://89.125.214.37:8443/api/health",
+      "url": "https://10.20.0.11:8443/api/health",
       "expect": [
         401
       ],
@@ -142,9 +142,9 @@
     },
     {
       "name": "mail-account",
-      "label": "mail /account (app passwords)",
+      "label": "mailbox /account (app passwords)",
       "type": "https",
-      "url": "https://mail.astralnet.io/account/",
+      "url": "https://mailbox.astralnet.io/account/",
       "expect": [
         200
       ]

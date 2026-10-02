@@ -152,9 +152,9 @@
     },
     {
       "name": "mail-account",
-      "label": "mail /account (app passwords)",
+      "label": "mailbox /account (app passwords)",
       "type": "https",
-      "url": "https://mail.astralnet.io/account/",
+      "url": "https://mailbox.astralnet.io/account/",
       "expect": [
         200
       ]
