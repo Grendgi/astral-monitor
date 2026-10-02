@@ -1,0 +1,22 @@
+[Unit]
+Description=astral external monitor (probes + Telegram alerts)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/opt/astral-monitor/astral-monitor -c /opt/astral-monitor/config.json run
+EnvironmentFile=/opt/astral-monitor/telegram.env
+# astral-id vantage only: HUB_URL + HUB_TOKEN → send via astral-notify, direct Telegram as fallback
+EnvironmentFile=-/opt/astral-monitor/hub.env
+Restart=always
+RestartSec=10
+StateDirectory=astral-monitor
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/astral-monitor /opt/astral-monitor
+PrivateTmp=yes
+MemoryMax=64M
+
+[Install]
+WantedBy=multi-user.target

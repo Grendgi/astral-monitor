@@ -1,0 +1,193 @@
+{
+  "vantage": "frankfurt",
+  "role": "primary",
+  "intervalSec": 60,
+  "failThreshold": 3,
+  "recoverThreshold": 2,
+  "certWarnDays": 14,
+  "remindHours": 6,
+  "heartbeatHourMSK": 9,
+  "peerStaleCycles": 5,
+  "peer": {
+    "name": "astral-id",
+    "ssh": "root@87.58.213.25",
+    "keyFile": "/opt/astral-monitor/peer_key"
+  },
+  "stateDir": "/var/lib/astral-monitor",
+  "silenceFile": "/opt/astral-monitor/silence",
+  "checks": [
+    {
+      "name": "panel",
+      "label": "VPN panel",
+      "type": "https",
+      "url": "https://panel.astralnet.io/",
+      "expect": [
+        200,
+        302
+      ]
+    },
+    {
+      "name": "panel-api",
+      "label": "VPN panel API",
+      "type": "https",
+      "url": "https://panel.astralnet.io/api/health",
+      "expect": [
+        401
+      ],
+      "bodyContains": "unauthorized"
+    },
+    {
+      "name": "vpn-direct",
+      "label": "VPN panel direct (MSK :8443)",
+      "type": "https",
+      "url": "https://89.125.214.37:8443/api/health",
+      "expect": [
+        401
+      ],
+      "insecure": true,
+      "bodyContains": "unauthorized"
+    },
+    {
+      "name": "sub",
+      "label": "VPN subscriptions",
+      "type": "https",
+      "url": "https://sub.astralnet.io/",
+      "expect": [
+        200,
+        302
+      ]
+    },
+    {
+      "name": "haproxy",
+      "label": "Proxy panel",
+      "type": "https",
+      "url": "https://haproxy.astralnet.io/",
+      "expect": [
+        200,
+        302
+      ]
+    },
+    {
+      "name": "id",
+      "label": "astral ID",
+      "type": "https",
+      "url": "https://id.astralnet.io/readyz",
+      "expect": [
+        200
+      ],
+      "jsonReady": true
+    },
+    {
+      "name": "console",
+      "label": "astral ID console",
+      "type": "https",
+      "url": "https://console.astralnet.io/",
+      "expect": [
+        302
+      ]
+    },
+    {
+      "name": "status",
+      "label": "status page",
+      "type": "https",
+      "url": "https://status.astralnet.io/",
+      "expect": [
+        200
+      ]
+    },
+    {
+      "name": "status-json",
+      "label": "status.json",
+      "type": "https",
+      "url": "https://status.astralnet.io/status.json",
+      "expect": [
+        200
+      ],
+      "bodyContains": "\"services\""
+    },
+    {
+      "name": "smtp-mx",
+      "label": "inbound mail (MX :25)",
+      "type": "smtp",
+      "addr": "mx.astralnet.io:25",
+      "starttls": true,
+      "serverName": "mail.astralnet.io",
+      "timeoutSec": 15
+    },
+    {
+      "name": "smtp-submission",
+      "label": "mail submission (:587)",
+      "type": "smtp",
+      "addr": "mail.astralnet.io:587",
+      "starttls": true,
+      "serverName": "mail.astralnet.io",
+      "timeoutSec": 15
+    },
+    {
+      "name": "dns-cloudflare",
+      "label": "DNS via 1.1.1.1",
+      "type": "dns",
+      "server": "1.1.1.1:53",
+      "lookups": [
+        {
+          "type": "MX",
+          "name": "astralnet.io",
+          "expect": "mx.astralnet.io"
+        },
+        {
+          "type": "A",
+          "name": "mx.astralnet.io",
+          "expect": "95.181.212.217"
+        },
+        {
+          "type": "A",
+          "name": "panel.astralnet.io",
+          "expect": "95.181.212.217"
+        },
+        {
+          "type": "A",
+          "name": "id.astralnet.io",
+          "expect": "95.181.212.217"
+        },
+        {
+          "type": "A",
+          "name": "mail.astralnet.io",
+          "expect": "87.58.213.25"
+        }
+      ]
+    },
+    {
+      "name": "dns-google",
+      "label": "DNS via 8.8.8.8",
+      "type": "dns",
+      "server": "8.8.8.8:53",
+      "lookups": [
+        {
+          "type": "MX",
+          "name": "astralnet.io",
+          "expect": "mx.astralnet.io"
+        },
+        {
+          "type": "A",
+          "name": "mx.astralnet.io",
+          "expect": "95.181.212.217"
+        },
+        {
+          "type": "A",
+          "name": "panel.astralnet.io",
+          "expect": "95.181.212.217"
+        },
+        {
+          "type": "A",
+          "name": "id.astralnet.io",
+          "expect": "95.181.212.217"
+        },
+        {
+          "type": "A",
+          "name": "mail.astralnet.io",
+          "expect": "87.58.213.25"
+        }
+      ]
+    }
+  ]
+}
