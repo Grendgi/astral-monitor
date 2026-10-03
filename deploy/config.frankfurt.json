@@ -58,6 +58,16 @@
       ]
     },
     {
+      "name": "portal",
+      "label": "VPN client portal",
+      "type": "https",
+      "url": "https://sub.astralnet.io/portal/api/status",
+      "expect": [
+        200
+      ],
+      "bodyContains": "\"enabled\":true"
+    },
+    {
       "name": "haproxy",
       "label": "Proxy panel",
       "type": "https",

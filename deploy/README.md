@@ -34,7 +34,7 @@ The peer reads status.json over SSH with a forced command in `/root/.ssh/authori
 - HTTPS (status code, certificate days left): panel `/` (200/302), panel `/api/health`
   (401 "unauthorized" = the VPN backend answers), MSK direct (401, bypasses the proxy;
   frankfurt `89.125.214.37:8443/api/health`, astral-id `10.20.0.11:8443/api/health` over awg-mgmt —
-  MSK tcp/8443 is open only to awg-mgmt and Frankfurt since 2026-10-03), sub `/`, haproxy `/` (200 from frankfurt; 403 from astral-id — the
+  MSK tcp/8443 is open only to awg-mgmt and Frankfurt since 2026-10-03), sub `/`, the VPN client portal `sub /portal/api/status` (200 with `"enabled":true` — DOWN also when the portal is switched off), haproxy `/` (200 from frankfurt; 403 from astral-id — the
   panel is behind the "VPN" access list), id `/readyz` (`ready:true`), console `/` (302),
   status `/` and `/status.json`.
 - SMTP: `mx.astralnet.io:25` banner + STARTTLS (both vantages), `mail.astralnet.io:587`
